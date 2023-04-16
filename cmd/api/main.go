@@ -9,6 +9,7 @@ import (
 
 	"bitbucket.org/mateusmarquezini/greenlight/internal/data"
 	"bitbucket.org/mateusmarquezini/greenlight/internal/jsonlog"
+	"bitbucket.org/mateusmarquezini/greenlight/internal/mailer"
 
 	_ "github.com/lib/pq"
 )
@@ -29,12 +30,20 @@ type config struct {
 		burst   int
 		enabled bool
 	}
+	smtp struct {
+		host     string
+		port     int
+		username string
+		password string
+		sender   string
+	}
 }
 
 type application struct {
 	config config
 	logger *jsonlog.Logger
 	models data.Models
+	mailer mailer.Mailer
 }
 
 func main() {
@@ -51,6 +60,12 @@ func main() {
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
 
+	flag.StringVar(&cfg.smtp.host, "smtp-host", "smtp.mailtrap.io", "SMTP host")
+	flag.IntVar(&cfg.smtp.port, "smtp-port", 2525, "SMTP port")
+	flag.StringVar(&cfg.smtp.username, "smtp-username", "5441f83e78d7eb", "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", "d30867d4f65b03", "SMTP password")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Greenlight <no-reply@greenlight.mateus.net>", "SMTP sender")
+
 	flag.Parse()
 
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
@@ -64,10 +79,19 @@ func main() {
 
 	logger.PrintInfo("database connection pool established", nil)
 
+	dialer := mailer.Dialer{
+		Host:     cfg.smtp.host,
+		Port:     cfg.smtp.port,
+		Username: cfg.smtp.username,
+		Password: cfg.smtp.password,
+		Sender:   cfg.smtp.sender,
+	}
+
 	app := &application{
 		config: cfg,
 		logger: logger,
 		models: data.NewModels(db),
+		mailer: mailer.New(dialer),
 	}
 
 	if err := app.serve(); err != nil {
