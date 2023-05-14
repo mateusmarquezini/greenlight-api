@@ -11,6 +11,10 @@ import (
 	"bitbucket.org/mateusmarquezini/greenlight/internal/validator"
 )
 
+const (
+	ScopeActivation = "activation"
+)
+
 type Token struct {
 	PlainText string
 	Hash      []byte
